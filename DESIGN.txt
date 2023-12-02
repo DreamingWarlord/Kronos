@@ -1,0 +1,166 @@
+Page size = 2 MiB
+
+Core
+	Caches
+		Memory Cache
+		TLB
+
+	Stack
+		Stack is always aligned to 8 bytes and grows upwards.
+
+	Interrupts and Exceptions
+		During an interrupt, SP is set to ISP and IP is set to IHP. The most significant bit
+		of IVR is set to the CPU privilege at the time of the interrupt. The privilege is
+		always set to 0 when an interrupt handler is called.
+		Here's the stackframe during an interrupt:
+
+		OFFSET   DESCRIPTION
+		 0x00     The value of IP before the interrupt
+		 0x08     The value of SP before the interrupt
+
+		Fault exceptions will push the value of IP *before* the faulty instruction.
+
+		Interrupt Vectors
+
+		VECTOR   TYPE   DESCRIPTION
+		  0      FAULT   Division by zero
+		  1      FAULT   Invalid-operation
+		  2      FAULT   Access violation
+		  3      TRAP    Breakpoint
+		  4      TRAP    Non-maskable interrupt
+		 5:7             Reserved
+		 EE              External interrupt
+		 EE              Software interrupt
+
+	TLB Refill Routine
+		After CR[2] is set, the processor will try to read the TLB for memory accesses.
+		If a virtual address does not have an entry present in the TLB, the TLB refill
+		routine is called by setting IP to TLBP and setting the privilege to 0. The
+		IP before the handler is saved in an invisible CPU register and jumped to when
+		the TLBRET instruction is executed. The virtual address is put in AVR. CR[2]
+		is also set back to 0 during the TLB refill routine. Interrupts cannot be
+		received while in a TLB refill routine and exceptions will cause a CPU reset.
+
+	Registers
+		R0-R15 | General Purpose Registers
+		IP     | Instruction Pointer
+		SP     | Stack Pointer
+		KR     | Kernel Register
+		UR     | User Register
+		CR     | Control Register
+		IHP    | Interrupt Handler Pointer
+		ISP    | Interrupt Stack Pointer
+		IVR    | Interrupt Vector Register
+		TLBP   | TLB Refill Routine Pointer
+		AVR    | Access Violation Register
+		FL     | Flags
+
+	The Flags Register
+
+	BITS   DESCRIPTION
+	 0      Zero flag
+	 1      Sign flag
+	 2      Carry flag
+	 3      Overflow flag
+	 4      Condition flag
+	5:63    Reserved
+
+	The Control Register
+
+	BITS   DESCRIPTION
+	 0      Interrupt enable flag
+	 1      Privilege flag (0: Kernel, 1: User)
+	 2      MMU enable flag
+	 3      Interrupt-in-service flag
+	3:63    Reserved
+
+	General Purpose Register Numbers
+	0-15: R0-R15
+
+	Special Purpose Register Numbers
+	0 | SP
+	1 | KR
+	2 | UR
+	3 | CR
+	4 | IHP
+	5 | ISP
+	6 | IVR
+	7 | TLBP
+	8 | AVR
+	9 | FL
+
+	TLB Entry
+
+	BITS   DESCRIPTION
+	0:17    Address Space Number
+	 18     Present
+	 19     Writable
+	 20     Cache
+	21:63   Higher 42 bits of physical address
+
+	General Purpose Instructions
+
+	OPC  SIZE   MNEMONIC   DESCRIPTION
+	 0     1      WBC       Writeback all caches of this core without invalidating them
+	 1     1      INVC      Writeback and invalidate all caches of this core
+	 2     1      INVTLB    Invalidate the TLB
+	 3     2      INVPG     Invalidate one page #1[0:3] from the TLB
+	 4     1      NOP       Does nothing
+	 5     1      HLT       Wait until the next interrupt
+	 6     1      PUSHA     Pushes R0-R15 to the stack in ascending order
+	 7     1      POPA      Pops R0-R15 from the stack in descending order
+	 8     1      RET       Return from call
+	 9     1      TLBRET    Return from TLB refill routine
+	10     1      IRET      Return from interrupt
+	11     1      CEQ       Set C flag if equal (Z)
+	12     1      CGT       Set C flag if greater than (!Z & !C)
+	13     1      CGE       Set C flag if greater than or equal to (!C)
+	14     1      CLT       Set C flag if less than (C)
+	15     1      CLE       Set C flag if less than or equal to (C | Z)
+	16     1      CSGT      Set C flag if signed greater than (!Z & S=O)
+	17     1      CSGE      Set C flag if signed greater than or equal to (S=O)
+	18     1      CSLT      Set C flag if signed less than (S!=O)
+	19     1      CSLE      Set C flag if signed less than or equal to (Z | S!=O)
+	20     5      CALL      Signed 32 bit relative call to $1:4
+	21     5      JMP       Signed 32 bit relative jump to $1:4
+	22     5      JC        Signed 32 bit relative jump to $1:4 if the C flag is set
+	23     2      INT       Software interrupt with vector #1[0:3]
+	24     2      CALLR     Call address in register #1[0:3]
+	25     2      JMPR      Jump to address in register #1[0:3]
+	26     2      TLBFILL   Moves TLB entry in #1[0:3] with address #AVR to the TLB
+	27     2      LDSP      Moves special register #1[4:7] to #1[0:3]
+	28     2      STSP      Moves #1[4:7] to special register #1[0:3]
+	29     2      MOV       Moves #1[4:7] to #1[0:3]
+	30     2      MOVC      Moves #1[4:7] to #1[0:3] if C flag is set
+	31     3      MOVI8     Moves 8 bit immediate $2:2 to #1[0:3]
+	32     4      MOVI16    Moves 16 bit immediate $2:3 to #1[0:3]
+	33     6      MOVI32    Moves 32 bit immediate $2:5 to #1[0:3]
+	34    10      MOVI64    Moves 64 bit immediate $2:9 to #1[0:3]
+	35     2      LOAD8     Loads the contents of address #1[4:7] and moves it into #1[0:3]
+	36     2      LOAD16    Loads the contents of address #1[4:7] and moves it into #1[0:3]
+	37     2      LOAD32    Loads the contents of address #1[4:7] and moves it into #1[0:3]
+	38     2      LOAD64    Loads the contents of address #1[4:7] and moves it into #1[0:3]
+	39     2      STORE8    Stores #1[4:7] in the contents of address #1[0:3]
+	40     2      STORE16   Stores #1[4:7] in the contents of address #1[0:3]
+	41     2      STORE32   Stores #1[4:7] in the contents of address #1[0:3]
+	42     2      STORE64   Stores #1[4:7] in the contents of address #1[0:3]
+	43     2      ADD       Adds #1[4:7] to #1[0:3]
+	44     2      SUB       Subtracts #1[4:7] from #1[0:3]
+	45     2      MUL       Multiplies #1[0:3] by #1[4:7]
+	46     2      DIV       Divides #1[0:3] by #1[4:7]
+	47     2      REM       Divides #1[0:3] by #1[4:7], stores remainder
+	48     2      AND       ANDs #1[0:3] by #1[4:7]
+	49     2      OR        ORs #1[0:3] by #1[4:7]
+	50     2      XOR       XORs #1[0:3] by #1[4:7]
+	51     2      SHL       Shifts #1[0:3] to the left by #1[4:7]
+	52     2      SHR       Shifts #1[0:3] to the right by #1[4:7]
+	53     3      SHLI      Shifts #1[0:3] to the left by $2[0:5]
+	54     3      SHRI      Shifts #1[0:3] to the right by $2[0:5]
+	55     2      NEG       Two's complements #1[0:3]
+	56     2      NOT       One's complements #1[0:3]
+	57     2      CMP       Subtracts #1[4:7] from #1[0:3] and sets flags.
+	58     2      EXT8      Sign-extends #1[0:3] from 8 bits to 64 bits
+	59     2      EXT16     Sign-extends #1[0:3] from 16 bits to 64 bits
+	60     2      EXT32     Sign-extends #1[0:3] from 32 bits to 64 bits
+	61     2      PUSH      Pushes #1[0:3] to the stack
+	62     2      POP       Pops value from stack to #1[0:3]
