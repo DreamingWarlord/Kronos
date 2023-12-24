@@ -1,38 +1,66 @@
 The 64-bit Kronos Architecture
 
+Board
+	Processors
+		L1 Cache
+		Local Interrupt Controller
+	Cache Coherency Protocol
+	L2 Cache
+	Bus
+	Interrupt Controller
+	Devices
+		RAM
+		ROM
+		Disk Controller
+			Disks
+
+Processor -> L1 -> Cache Coherency Protocol -> L2 Cache -> Bus -> RAM
+
+
 General Purpose Registers
 	R0-R15
 
 Specific Purpose Registers
-	IP  - Instruction pointer (always aligned to 16 bits, user can read or write, not addressable)
-	SP  - Stack pointer (user can read)
+	IP  - Instruction pointer (aligned to 2 bits)
+	SP  - Stack pointer (user can read / write)
 	UR  - User register (user can read)
 	KR  - Kernel register
 	IHP - Interrupt handler pointer
-	IRA - Interrupt return address (least significant bit is privilege)
+	IRA - Interrupt return address
+	IRC - Interrupt return control (0th bit is privilege, 1st bit is SCR[IE])
 	AVA - Access violation address
-	TMA - TLB Miss address
-	TRA - TLB Return address (least significant bit is privilege)
-	ECR - Exception control register (readonly)
+	ECR - Exception control register
+	TMA - TLB miss address
+	TRA - TLB return address (least significant bit is privilege)
 	SCR - Status control register
+	ICR - Interrupt control register
+	IPI - Interprocess interrupt register
 
 Exception Control Register
-	0:2  - Exception vector
-		0: No exception
-		1: Invalid operation
-		2: Access violation
-		3: Misaligned access
-	 3   - Write error
-	4:63 - Reserved
+	0:1  - Exception vector
+	        0: No exception
+	        1: Invalid operation
+	        2: Access violation
+	        3: Misaligned access
+	 2   - Write error
+	3:63 - Reserved
 
 Status Control Register
 	0:8   - Address space ID
 	 9    - Interrupt enable
 	10    - Privilege, 0: Kernel, 1: User
 	11    - MMU enable
-	12    - TLB refill
-	13    - Halt
-	14:63 - Reserved
+	12    - Halt
+	13:63 - Reserved
+
+Interrupt Control Register
+	0:31  - Core ID
+	32:63 - Interrupt masks
+
+InterProcess Interrupt Register
+	0:31  - Destination core ID
+	 32   - Exclusive (Send to all except destination core)
+	33:63 - Reserved
 
 TLB Entry
 	0:8   - Address space ID
@@ -42,63 +70,58 @@ TLB Entry
 	12:63 - Higher 52 bits of physical address
 
 Instruction Encoding
-	0:7   - Opcode
-	8:11  - Destination
-	12:15 - Source
-
+	8 bit opcode
+	optional 8 bit dest/src
+	optional n bit immediate
 	Certain opcodes require a properly aligned constant after them
 
 Instruction Set
-	Opcode - Mnemonic - Description
+	Opcode - Size - Mnemonic - Description
 
-	 0 - NOP     - Do nothing for a cycle
-	 1 - WBC     - Writeback all caches of this core without invalidating them
-	 2 - INVC    - Writeback all caches of this core and invalidate them
-	 3 - INVTLB  - Invalidate the entire TLB
-	 4 - INVPG   - Invalidate a single TLB entry at virt address dest
-	 5 - RET     - Pop stack to IP
-	 6 - TLBRET  - Return from TLB refill
-	 7 - IRET    - Return from interrupt
-	 8 - UD      - Invalid instruction
-	 9 - FENCE   - Memory fence loads and stores
-	 A - PUSH    - Push dest to stack
-	 B - POP     - Pop stack to dest
-	 C - NEG     - Two's complement dest
-	 D - NOT     - One's complement dest
-	 E - EXT8    - Sign-extend dest from 8 to 64 bits
-	 F - EXT16   - Sign-extend dest from 16 to 64 bits
-	10 - EXT32   - Sign-extend dest from 32 to 64 bits
-	11 - JMPR    - Jump to dest
-	12 - CALLR   - Call dest
-	13 - TLBFILL - Moves TLB entry dest with address TMA to the TLB
-	14 - JMP     - Signed 24 bit relative jump
-	15 - CALL    - Signed 24 bit relative call
-	16 - IMM8    - Move 8 bit immediate to dest
-	17 - IMM16   - Move 16 bit immediate to dest
-	18 - IMM32   - Move 32 bit immediate to dest
-	19 - IMM64   - Move 64 bit immediate to dest
-	1A - JC      - Conditional 32 bit relative jump if mask3 & dest is nonzero
-	1B - MOV     - Move src to dest
-	1C - LDSP    - Move special register src to dest
-	1D - STSP    - Move src to special register dest
-	1E - LOAD8   - Load the 8 bit contents of src into dest
-	1F - LOAD16  - Load the 16 bit contents of src into dest
-	20 - LOAD32  - Load the 32 bit contents of src into dest
-	21 - LOAD64  - Load the 64 bit contents of src into dest
-	22 - STORE8  - Store the 8 bit contents of src in dest
-	23 - STORE16 - Store the 16 bit contents of src in dest
-	24 - STORE32 - Store the 32 bit contents of src in dest
-	25 - STORE64 - Store the 64 bit contents of src in dest
-	26 - ADD     - Add src to dest
-	27 - SUB     - Subtract src from dest
-	28 - MUL     - Multiply src with dest
-	29 - DIV     - Divide dest by src
-	2A - REM     - Remainder of dest with src
-	2B - AND     - Bitwise-and dest with src
-	2C - OR      - Bitwise-or dest with src
-	2D - XOR     - Bitwise-xor dest with src
-	2E - SHL     - Shift dest to the left by src
-	2F - SHR     - Shift dest to the right by src
-	30 - CMP     - Compare dest with src, set dest to the flags
-	31 - SCMP    - Signed compare dest with src, set dest to the flags
-	               0: equal 1: greater 2: lesser
+	 0 - 1 - NOP     - Do nothing for a cycle
+	 1 - 1 - WBC     - Writeback all caches of this core without invalidating them
+	 2 - 1 - INVPG   - Invalidate a single TLB entry at virt address dest
+	 3 - 1 - RET     - Pop stack to IP
+	 4 - 1 - TLBRET  - Return from TLB refill
+	 5 - 1 - IRET    - Return from interrupt
+	 6 - 1 - UD      - Invalid instruction
+	 7 - 1 - FENCE   - Memory fence loads and stores
+	 8 - 2 - PUSH    - Push dest to stack
+	 9 - 2 - POP     - Pop stack to dest
+	 A - 2 - NEG     - Two's complement dest
+	 B - 2 - NOT     - One's complement dest
+	 C - 2 - EXT8    - Sign-extend dest from 8 to 64 bits
+	 D - 2 - EXT16   - Sign-extend dest from 16 to 64 bits
+	 E - 2 - EXT32   - Sign-extend dest from 32 to 64 bits
+	 F - 2 - JMPR    - Jump to dest
+	10 - 2 - CALLR   - Call dest
+	11 - 2 - TLBFILL - Moves TLB entry dest with address TMA to the TLB
+	12 - 4 - JMP     - Signed 24 bit relative jump
+	13 - 4 - CALL    - Signed 24 bit relative call
+	14 - 4 - IMM16   - Move 16 bit immediate to dest
+	15 - 8 - IMM48   - Move 48 bit immediate to dest
+	16 - 4 - JC      - Conditional 16 bit relative jump if mask3 & dest is nonzero
+	17 - 2 - MOV     - Move src to dest
+	18 - 2 - LDSP    - Move special register src to dest
+	19 - 2 - STSP    - Move src to special register dest
+	1A - 2 - LOAD8   - Load the 8 bit contents of src into dest
+	1B - 2 - LOAD16  - Load the 16 bit contents of src into dest
+	1C - 2 - LOAD32  - Load the 32 bit contents of src into dest
+	1D - 2 - LOAD64  - Load the 64 bit contents of src into dest
+	1E - 2 - STORE8  - Store the 8 bit contents of src in dest
+	1F - 2 - STORE16 - Store the 16 bit contents of src in dest
+	20 - 2 - STORE32 - Store the 32 bit contents of src in dest
+	21 - 2 - STORE64 - Store the 64 bit contents of src in dest
+	22 - 2 - ADD     - Add src to dest
+	23 - 2 - SUB     - Subtract src from dest
+	24 - 2 - MUL     - Multiply src with dest
+	25 - 2 - DIV     - Divide dest by src
+	26 - 2 - REM     - Remainder of dest with src
+	27 - 2 - AND     - Bitwise-and dest with src
+	28 - 2 - OR      - Bitwise-or dest with src
+	29 - 2 - XOR     - Bitwise-xor dest with src
+	2A - 2 - SHL     - Shift dest to the left by src
+	2B - 2 - SHR     - Shift dest to the right by src
+	2C - 2 - CMP     - Compare dest with src, set dest to the flags
+	2D - 2 - SCMP    - Signed compare dest with src, set dest to the flags
+	                   0: equal 1: greater 2: lesser

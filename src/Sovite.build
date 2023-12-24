@@ -1,0 +1,24 @@
+bin_dir "../bin"
+compile "clang -Wall -Wextra -Werror -Wno-unused -Wno-multichar -Wno-unused-parameter -std=gnu11 -O3 -IInc -g -funsigned-char -fsanitize=address,undefined -c %src_file% -o %obj_file%"
+link "clang -fsanitize=address,undefined -lpthread -g %obj_files% -o kemu"
+
+targets
+[
+	<Main.c>      [ <Inc/Common.h> ]
+	<Util.c>      [ <Inc/Common.h> ]
+	<Loop.c>      [ <Inc/Common.h> ]
+	<Bus.c>       [ <Inc/Bus.h>    ]
+	<Interrupt.c> [ <Inc/Interrupt.h> <Inc/Bus.h> ]
+	<Memory.c>    [ <Inc/Memory.h>    <Inc/Bus.h> ]
+	<Processor.c> [ <Inc/Processor.h> <Inc/Bus.h> <Inc/OpCodes.h> ]
+]
+
+dependencies
+[
+	<Inc/Common.h>
+	<Inc/OpCodes.h>
+	<Inc/Interrupt.h> [ <Inc/Common.h> ]
+	<Inc/Bus.h>       [ <Inc/Common.h> ]
+	<Inc/Memory.h>    [ <Inc/Common.h> ]
+	<Inc/Processor.h> [ <Inc/Common.h> ]
+]
