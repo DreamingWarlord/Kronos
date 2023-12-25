@@ -75,39 +75,42 @@ void ProcCycle(struct Processor *proc)
 	uint64 regs[32];
 	memcpy(regs, proc->regs, 256);
 
-	if(opcode == OPC_JMP || opcode == OPC_CALL) {
+	switch(opcode)
+	{
+	case OPC_JMP:
+	case OPC_CALL:
 		MemReq(instr, regs[REG_IP], 4, FALSE);
 		regs[REG_IP] += 4;
-		opcode = instr[0];
 		memcpy(&imm, &instr[1], 3);
 		imm = (int64) (((int32) (imm << 8)) >> 8);
-	} else if(opcode == OPC_JC) {
+		break;
+	case OPC_JC:
 		MemReq(instr, regs[REG_IP], 4, FALSE);
 		regs[REG_IP] += 4;
-		opcode = instr[0];
-		operands = instr[1];
 		memcpy(&imm, &instr[2], 2);
 		imm = (int64) (int16) imm;
-	} else if(opcode == OPC_IMM16) {
+		break;
+	case OPC_IMM16:
 		MemReq(instr, regs[REG_IP], 4, FALSE);
 		regs[REG_IP] += 4;
-		opcode = instr[0];
-		operands = instr[1];
 		memcpy(&imm, &instr[2], 2);
-	} else if(opcode == OPC_IMM48) {
+	case OPC_IMM48:
 		MemReq(instr, regs[REG_IP], 8, FALSE);
 		regs[REG_IP] += 8;
-		opcode = instr[0];
-		operands = instr[1];
 		memcpy(&imm, &instr[2], 6);
-	} else if(opcode > 7) {
-		MemReq(instr, regs[REG_IP], 2, FALSE);
-		regs[REG_IP] += 2;
-		opcode = instr[0];
-		operands = instr[1];
-	} else {
-		MemReq(&opcode, regs[REG_IP]++, 1, FALSE);
+	default:
+		if(opcode > 7) {
+			MemReq(instr, regs[REG_IP], 2, FALSE);
+			regs[REG_IP] += 2;
+		} else {
+			MemReq(instr, regs[REG_IP]++, 1, FALSE);
+		}
+
+		break;
 	}
+
+	opcode = instr[0];
+	operands = instr[1];
 
 	switch(opcode)
 	{
