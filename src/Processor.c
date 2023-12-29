@@ -12,6 +12,12 @@ static struct Processor *processors[PROC_MAX] = { NULL };
 static uint64 processorc = 0;
 
 
+static uint64 TLBPageIdx(uint64 addr)
+{
+	return ((addr >> 63) | ((addr >> 11) & ~1ULL)) % TLB_ENTRY_MAX;
+}
+
+
 struct Processor **ProcList()
 {
 	return processors;
@@ -48,11 +54,32 @@ bool ProcReq(struct Processor *proc, void *ptr, uint64 addr, uint64 size, bool w
 		return FALSE;
 	}
 
-	if(proc->regs[REG_SCR] & SCR_MMU) {
-		// TODO: Handle MMU
+	if(!(proc->regs[REG_SCR] & SCR_MMU)) {
+		BusReq(ptr, addr, size, write);
+		return TRUE;
 	}
 
-	BusReq(ptr, addr, size, write);
+	uint64 page_idx = TLBPageIdx(addr);
+	uint64 tlb_addr = proc->tlb_addr[page_idx];
+	uint64 tlb_data = proc->tlb_data[page_idx];
+
+	if(tlb_addr != (addr & ~4095ULL) || (tlb_data & TLB_ASID) != (proc->regs[REG_SCR] & SCR_ASID)) {
+		proc->tlb_addr[page_idx] = -1ULL;
+		proc->tlb_data[page_idx] = 0;
+		proc->regs[REG_TRA] = proc->regs[REG_IP];
+		proc->regs[REG_TRC] = !!(proc->regs[REG_SCR] & SCR_PV) | (!!(proc->regs[REG_SCR] & SCR_IE) << 1);
+		proc->regs[REG_SCR] &= ~(SCR_IE | SCR_PV | SCR_MMU);
+		proc->regs[REG_IP] = proc->regs[REG_THP];
+		return FALSE;
+	}
+
+	if(((addr >> 63) && (proc->regs[REG_SCR] & SCR_PV)) || (!(tlb_data & TLB_PR) || (!(tlb_data & TLB_WR) && write))) {
+		proc->regs[REG_ECR] = EV_ACVIO | (write ? ECR_WR : 0);
+		proc->int_req = TRUE;
+		return FALSE;
+	}
+
+	BusReq(ptr, (tlb_data & TLB_ADDR) | (addr & 4095ULL), size, write);
 	return TRUE;
 }
 
@@ -62,7 +89,7 @@ void ProcCycle(struct Processor *proc)
 
 	if(proc->int_req) {
 		proc->regs[REG_IRA] = proc->regs[REG_IP];
-		proc->regs[REG_ICR] = !!(proc->regs[REG_SCR] & SCR_PV) | (!!(proc->regs[REG_SCR] & SCR_IE) << 1);
+		proc->regs[REG_IRC] = !!(proc->regs[REG_SCR] & SCR_PV) | (!!(proc->regs[REG_SCR] & SCR_IE) << 1);
 		proc->regs[REG_SCR] &= ~(SCR_IE | SCR_PV);
 		proc->regs[REG_IP] = proc->regs[REG_IHP];
 		proc->int_req = FALSE;
@@ -121,6 +148,8 @@ void ProcCycle(struct Processor *proc)
 		break;
 	case OPC_INVPG:
 		PrivCheck();
+		proc->tlb_addr[TLBPageIdx(regs[REG_TMA])] = -1ULL;
+		proc->tlb_data[TLBPageIdx(regs[REG_TMA])] = -1ULL;
 		break;
 	case OPC_RET:
 		regs[REG_SP] -= 8;
@@ -128,12 +157,16 @@ void ProcCycle(struct Processor *proc)
 		break;
 	case OPC_TLBRET:
 		PrivCheck();
+		regs[REG_IP] = regs[REG_TRA];
+		regs[REG_SCR] |= (regs[REG_TRC] & 1) ? SCR_PV : 0;
+		regs[REG_SCR] |= (regs[REG_TRC] & 2) ? SCR_IE : 0;
+		regs[REG_SCR] |= SCR_MMU;
 		break;
 	case OPC_IRET:
 		PrivCheck();
 		regs[REG_IP] = regs[REG_IRA];
-		regs[REG_SCR] |= (regs[REG_ICR] & 1) ? SCR_PV : 0;
-		regs[REG_SCR] |= (regs[REG_ICR] & 2) ? SCR_IE : 0;
+		regs[REG_SCR] |= (regs[REG_IRC] & 1) ? SCR_PV : 0;
+		regs[REG_SCR] |= (regs[REG_IRC] & 2) ? SCR_IE : 0;
 		break;
 	case OPC_UD:
 		proc->regs[REG_ECR] = EV_INVOP;
@@ -174,6 +207,8 @@ void ProcCycle(struct Processor *proc)
 		break;
 	case OPC_TLBFILL:
 		PrivCheck();
+		proc->tlb_addr[TLBPageIdx(regs[REG_TMA])] = REG_TMA & (~4095ULL);
+		proc->tlb_data[TLBPageIdx(regs[REG_TMA])] = regs[operands & 0xF];
 		break;
 	case OPC_JMP:
 		regs[REG_IP] += imm - 4;

@@ -31,7 +31,9 @@ Specific Purpose Registers
 	AVA - Access violation address
 	ECR - Exception control register
 	TMA - TLB miss address
-	TRA - TLB return address (least significant bit is privilege)
+	TRA - TLB return address
+	TRC - TLB return control
+	THP - TLB handler pointer
 	SCR - Status control register
 	ICR - Interrupt control register
 	IPI - Interprocess interrupt register
@@ -80,7 +82,7 @@ Instruction Set
 
 	 0 - 1 - NOP     - Do nothing for a cycle
 	 1 - 1 - WBC     - Writeback all caches of this core without invalidating them
-	 2 - 1 - INVPG   - Invalidate a single TLB entry at virt address dest
+	 2 - 1 - INVPG   - Invalidate a single TLB entry at TMA
 	 3 - 1 - RET     - Pop stack to IP
 	 4 - 1 - TLBRET  - Return from TLB refill
 	 5 - 1 - IRET    - Return from interrupt

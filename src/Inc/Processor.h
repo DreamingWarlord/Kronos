@@ -3,20 +3,22 @@
 #include "Common.h"
 
 
-#define REG_IP   0
-#define REG_SP   1
-#define REG_UR   2
-#define REG_KR   3
-#define REG_IHP  4
-#define REG_IRA  5
-#define REG_IRC  6
-#define REG_AVA  7
-#define REG_ECR  8
-#define REG_TMA  9
-#define REG_TRA 10
-#define REG_SCR 11
-#define REG_ICR 12
-#define REG_IPI 13
+#define REG_IP  16
+#define REG_SP  17
+#define REG_UR  18
+#define REG_KR  19
+#define REG_IHP 20
+#define REG_IRA 21
+#define REG_IRC 22
+#define REG_AVA 23
+#define REG_ECR 24
+#define REG_TMA 25
+#define REG_TRA 26
+#define REG_TRC 27
+#define REG_THP 28
+#define REG_SCR 29
+#define REG_ICR 30
+#define REG_IPI 31
 
 #define EV_NOEXC 0
 #define EV_INVOP 1
@@ -43,6 +45,7 @@
 #define TLB_WR   (1ULL << 10)
 #define TLB_CE   (1ULL << 11)
 #define TLB_ADDR (~4095ULL)
+#define TLB_ENTRY_MAX 16384
 
 
 struct Processor
@@ -53,6 +56,8 @@ struct Processor
 	uint32            id;
 	uint64        cycles;
 	uint64          regs[32];
+	uint64      tlb_addr[TLB_ENTRY_MAX];
+	uint64      tlb_data[TLB_ENTRY_MAX];
 };
 
 
