@@ -45,7 +45,6 @@
 #define TLB_WR   (1ULL << 10)
 #define TLB_CE   (1ULL << 11)
 #define TLB_ADDR (~4095ULL)
-#define TLB_ENTRY_MAX 16384
 
 
 struct Processor
@@ -56,8 +55,9 @@ struct Processor
 	uint32            id;
 	uint64        cycles;
 	uint64          regs[32];
-	uint64      tlb_addr[TLB_ENTRY_MAX];
-	uint64      tlb_data[TLB_ENTRY_MAX];
+	uint64      tlb_addr[64];
+	uint64      tlb_data[64];
+	uint64      tlb_hint;
 };
 
 

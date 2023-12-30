@@ -12,9 +12,24 @@ static struct Processor *processors[PROC_MAX] = { NULL };
 static uint64 processorc = 0;
 
 
-static uint64 TLBPageIdx(uint64 addr)
+static uint64 TLBPageIdx(struct Processor *proc, uint64 addr)
 {
-	return ((addr >> 63) | ((addr >> 11) & ~1ULL)) % TLB_ENTRY_MAX;
+	addr &= ~4095ULL;
+
+	if(proc->tlb_hint != -1ULL && proc->tlb_addr[proc->tlb_hint] == addr)
+		return proc->tlb_hint;
+
+	uint64 first_invl = 0;
+
+	for(uint64 i = 0; i < 64; i++) {
+		if(proc->tlb_addr[i] == addr)
+			return i;
+
+		if(proc->tlb_addr[i] == -1ULL && first_invl == 0)
+			first_invl = i;
+	}
+
+	return first_invl;
 }
 
 
@@ -59,7 +74,7 @@ bool ProcReq(struct Processor *proc, void *ptr, uint64 addr, uint64 size, bool w
 		return TRUE;
 	}
 
-	uint64 page_idx = TLBPageIdx(addr);
+	uint64 page_idx = TLBPageIdx(proc, addr);
 	uint64 tlb_addr = proc->tlb_addr[page_idx];
 	uint64 tlb_data = proc->tlb_data[page_idx];
 
@@ -146,11 +161,21 @@ void ProcCycle(struct Processor *proc)
 	case OPC_WBC:
 		PrivCheck();
 		break;
-	case OPC_INVPG:
+	case OPC_INVPG: {
 		PrivCheck();
-		proc->tlb_addr[TLBPageIdx(regs[REG_TMA])] = -1ULL;
-		proc->tlb_data[TLBPageIdx(regs[REG_TMA])] = -1ULL;
+		uint64 page_idx = TLBPageIdx(proc, regs[REG_TMA]);
+
+		if(proc->tlb_addr[page_idx] != (regs[REG_TMA] & ~4095ULL))
+			break;
+
+		proc->tlb_addr[page_idx] = -1ULL;
+		proc->tlb_data[page_idx] = -1ULL;
+
+		if(page_idx == proc->tlb_hint)
+			proc->tlb_hint = -1ULL;
+
 		break;
+	}
 	case OPC_RET:
 		regs[REG_SP] -= 8;
 		MemReq(&regs[REG_IP], regs[REG_SP], 8, FALSE);
@@ -205,11 +230,17 @@ void ProcCycle(struct Processor *proc)
 		regs[REG_SP] += 8;
 		regs[REG_IP] = regs[operands & 0xF];
 		break;
-	case OPC_TLBFILL:
+	case OPC_TLBFILL: {
 		PrivCheck();
-		proc->tlb_addr[TLBPageIdx(regs[REG_TMA])] = REG_TMA & (~4095ULL);
-		proc->tlb_data[TLBPageIdx(regs[REG_TMA])] = regs[operands & 0xF];
+		uint64 page_idx = TLBPageIdx(proc, regs[REG_TMA]);
+		proc->tlb_addr[page_idx] = REG_TMA & ~4095ULL;
+		proc->tlb_data[page_idx] = regs[operands & 0xF];
+
+		if(page_idx == proc->tlb_hint)
+			proc->tlb_hint = -1ULL;
+
 		break;
+	}
 	case OPC_JMP:
 		regs[REG_IP] += imm - 4;
 		break;
