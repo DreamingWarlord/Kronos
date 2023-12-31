@@ -78,7 +78,7 @@ bool ProcReq(struct Processor *proc, void *ptr, uint64 addr, uint64 size, bool w
 	uint64 tlb_addr = proc->tlb_addr[page_idx];
 	uint64 tlb_data = proc->tlb_data[page_idx];
 
-	if(tlb_addr != (addr & ~4095ULL) || (tlb_data & TLB_ASID) != (proc->regs[REG_SCR] & SCR_ASID)) {
+	if(tlb_addr != (addr & ~4095ULL) || ((tlb_data & TLB_ASID) != (proc->regs[REG_SCR] & SCR_ASID) && (tlb_data & TLB_ASID) != 511)) {
 		proc->tlb_addr[page_idx] = -1ULL;
 		proc->tlb_data[page_idx] = 0;
 		proc->regs[REG_TRA] = proc->regs[REG_IP];
